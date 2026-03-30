@@ -340,8 +340,37 @@ function CreateView({post:ep,storeName,onSave,onBack}){
   // Re-enhance when price/tag changes
   useEffect(()=>{if(imageUrl&&mediaType==="image"&&price)enhanceImage(imageUrl,price,storeName,tag).then(setEnhancedUrl).catch(()=>{});},[price,tag]);
 
+  // Style-specific fallback captions (used when API fails) — modelled on real shop posts
+  const buildFallback=(useStyle)=>{
+    const t=storeName?`#${storeName.replace(/\s/g,"").toLowerCase()}`:"#localshop";
+    const p=price?`£${price}`:"";
+    const fb={
+      hype_drop:`🚨 IT'S BACK... AND FLYING OUT AGAIN! 🚨\n\n${productName} is BACK IN STOCK 🔥${p?` MAX 2 PER CUSTOMER ‼️`:""}\n(Sold out last week... and we know what's about to happen again 👀)\n\nThis one's been going CRAZY — everyone's talking about it!\n\nBe quick... once it's gone, it's GONE again!\n\n📍 ${storeName||"Pop in store"}\n\n#ConvenienceStore #Deals ${t}`,
+      new_arrival:`🍫 NEW ${productName.toUpperCase()} 🍫\n\nJust landed at ${storeName||"the shop"}!! 😱\n\n${productName} *AVAILABLE* Now!! 😋${p?`\nJust ${p}`:""}\n\nBe Quick As They're Flying Out!! ⏳\n\n📍 ${storeName||"In store now"}\n\n#NewIn #ConvenienceStore ${t}`,
+      price_hero:`${productName} Now At ${storeName||"Our Store"}!\n${p?`Only ${p} 🇬🇧`:""}\nIn Store Now! Be Quick!!\n\nGrab It While Stock Last!\n\n#ConvenienceStore #Deals ${t} #fyp`,
+      local_shoutout:`You asked, we listened 👏\n\n${productName} is now available at ${storeName||"our shop"}!${p?` Just ${p}.`:""}\n\nPop into the store and grab yours 🎁\n\nA big thank you to everyone who keeps coming back — you lot are the best 👀✨\n\n📍 ${storeName||"Come see us"}\n\n#LocalShop #SupportLocal ${t}`,
+      weekend_vibe:`Perfect for tonight 👌\n\n${productName}${p?` — just ${p}`:""}\n\nSweet, refreshing & made for the weekend vibes 🙌\n\nJust in time for the weekend! Whether you're chilling at home or stocking up for a get-together... don't miss this!\n\n📍 ${storeName||"Available now"}\n\n#WeekendVibes #Drinks ${t}`,
+      staff_pick:`Honestly? This one caught us off guard 👏\n\n${productName}${p?` — ${p}`:""}\n\nWe've been trying everything new that comes in and THIS is the one. Trust us on this.\n\nGive it a try — you won't regret it 🔥\n\n📍 ${storeName||"In store"}\n\n#StaffPick #TryThis ${t}`,
+    };
+    return fb[useStyle]||fb.new_arrival;
+  };
+
   // Generate caption — accepts optional style override to avoid stale closure
-  const genCaption=async(styleOverride)=>{const useStyle=styleOverride||style;setGenerating(true);try{const res=await fetch("/api/generate-caption",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({productName,price,storeName,style:useStyle})});const data=await res.json();if(data.caption)setCaption(data.caption);else throw new Error();}catch{const t=storeName?`#${storeName.replace(/\s/g,"").toLowerCase()}`:"#localshop";setCaption(`${productName}${price?` — just £${price}`:""} 🔥\n\nIn store NOW. You know where we are 👀\n\n#ConvenienceStore #Deals ${t}`);}setGenerating(false);};
+  const genCaption=async(styleOverride)=>{
+    const useStyle=styleOverride||style;
+    setGenerating(true);
+    try{
+      const res=await fetch("/api/generate-caption",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({productName,price,storeName,style:useStyle})});
+      if(!res.ok)throw new Error(`API ${res.status}`);
+      const data=await res.json();
+      if(data.caption&&data.caption.length>20)setCaption(data.caption);
+      else throw new Error("Empty caption");
+    }catch(e){
+      console.warn("Caption API failed, using style fallback:",e.message);
+      setCaption(buildFallback(useStyle));
+    }
+    setGenerating(false);
+  };
 
   // Select style AND auto-regenerate immediately with new value
   const selectStyle=(newStyle)=>{setStyle(newStyle);if(step===3)genCaption(newStyle);};
