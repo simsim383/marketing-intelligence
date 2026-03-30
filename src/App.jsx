@@ -340,11 +340,11 @@ function CreateView({post:ep,storeName,onSave,onBack}){
   // Re-enhance when price/tag changes
   useEffect(()=>{if(imageUrl&&mediaType==="image"&&price)enhanceImage(imageUrl,price,storeName,tag).then(setEnhancedUrl).catch(()=>{});},[price,tag]);
 
-  // AUTO-REGENERATE when style changes (bug fix)
-  const prevStyle=useRef(style);
-  useEffect(()=>{if(prevStyle.current!==style&&caption&&step===3){prevStyle.current=style;genCaption();}else{prevStyle.current=style;}},[style]);
+  // Generate caption — accepts optional style override to avoid stale closure
+  const genCaption=async(styleOverride)=>{const useStyle=styleOverride||style;setGenerating(true);try{const res=await fetch("/api/generate-caption",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({productName,price,storeName,style:useStyle})});const data=await res.json();if(data.caption)setCaption(data.caption);else throw new Error();}catch{const t=storeName?`#${storeName.replace(/\s/g,"").toLowerCase()}`:"#localshop";setCaption(`${productName}${price?` — just £${price}`:""} 🔥\n\nIn store NOW. You know where we are 👀\n\n#ConvenienceStore #Deals ${t}`);}setGenerating(false);};
 
-  const genCaption=async()=>{setGenerating(true);try{const res=await fetch("/api/generate-caption",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({productName,price,storeName,style})});const data=await res.json();if(data.caption)setCaption(data.caption);else throw new Error();}catch{const t=storeName?`#${storeName.replace(/\s/g,"").toLowerCase()}`:"#localshop";setCaption(`${productName}${price?` — just £${price}`:""} 🔥\n\nIn store NOW. You know where we are 👀\n\n#ConvenienceStore #Deals ${t}`);}setGenerating(false);};
+  // Select style AND auto-regenerate immediately with new value
+  const selectStyle=(newStyle)=>{setStyle(newStyle);if(step===3)genCaption(newStyle);};
 
   const save=()=>onSave({id:ep?.id||`post_${Date.now()}`,imageUrl:enhancedUrl||imageUrl,productName,price,tag,style,caption,showBranding,mediaType,createdAt:ep?.createdAt||new Date().toISOString()});
 
@@ -399,19 +399,20 @@ function CreateView({post:ep,storeName,onSave,onBack}){
         </div>
       </div>}
 
-      {/* STEP 3: Caption — auto-regenerates on style change */}
+      {/* STEP 3: Caption — tapping a style auto-regenerates */}
       {step===3&&<div className="fade-up">
-        <SectionLabel style={{marginBottom:10}}>Caption style</SectionLabel>
+        <SectionLabel style={{marginBottom:10}}>Caption style <span style={{fontWeight:400,color:C.dim,textTransform:"none",letterSpacing:0}}>— tap to regenerate</span></SectionLabel>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:16}}>
-          {CAPTION_STYLES.map(s=><button key={s.id} onClick={()=>setStyle(s.id)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 8px",borderRadius:12,cursor:"pointer",border:style===s.id?`1.5px solid ${C.purple}`:`1px solid ${C.border}`,background:style===s.id?C.purpleDim:C.surface,transition:"all 0.2s"}}><span style={{fontSize:16}}>{s.emoji}</span><div style={{fontSize:10,fontWeight:700,color:C.white}}>{s.label}</div><div style={{fontSize:8,color:C.dim}}>{s.best}</div></button>)}
+          {CAPTION_STYLES.map(s=><button key={s.id} onClick={()=>selectStyle(s.id)} disabled={generating} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 8px",borderRadius:12,cursor:generating?"wait":"pointer",border:style===s.id?`1.5px solid ${C.purple}`:`1px solid ${C.border}`,background:style===s.id?C.purpleDim:C.surface,transition:"all 0.2s",opacity:generating&&style!==s.id?0.5:1}}><span style={{fontSize:16}}>{s.emoji}</span><div style={{fontSize:10,fontWeight:700,color:C.white}}>{s.label}</div><div style={{fontSize:8,color:C.dim}}>{s.best}</div></button>)}
         </div>
-        <Btn onClick={genCaption} disabled={generating} style={{width:"100%",justifyContent:"center",padding:14,borderRadius:12,background:C.purpleDim,color:C.purple,border:`1px solid ${C.purple}33`,marginBottom:14}}>
-          {generating?<><RefreshCw size={14} style={{animation:"spin 1s linear infinite"}}/> Writing…</>:<><Wand2 size={14}/> {caption?"Regenerate":"Generate"}</>}
-        </Btn>
+        {generating&&<div style={{textAlign:"center",padding:"8px 0 14px",fontSize:12,color:C.purple,fontWeight:600,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><RefreshCw size={12} style={{animation:"spin 1s linear infinite"}}/> Rewriting as {CAPTION_STYLES.find(s=>s.id===style)?.label}…</div>}
+        {!generating&&<Btn onClick={()=>genCaption()} style={{width:"100%",justifyContent:"center",padding:14,borderRadius:12,background:C.purpleDim,color:C.purple,border:`1px solid ${C.purple}33`,marginBottom:14}}>
+          <Wand2 size={14}/> {caption?"Regenerate":"Generate"}
+        </Btn>}
         <div style={{position:"relative"}}><textarea value={caption} onChange={e=>setCaption(e.target.value)} placeholder="Your AI caption will appear here — or write your own…" rows={8} style={{width:"100%",padding:16,borderRadius:14,background:C.surface,color:C.white,border:`1px solid ${C.border}`,fontSize:13,lineHeight:1.7,outline:"none",fontFamily:FONT,resize:"vertical",boxSizing:"border-box"}}/><div style={{position:"absolute",bottom:8,right:12,fontSize:10,color:wc>150?C.red:C.dim,fontWeight:600}}>{wc}/150 words</div></div>
         <div style={{display:"flex",gap:8,marginTop:14}}>
           <Btn onClick={()=>setStep(2)} style={{padding:14,borderRadius:12}}><ChevronLeft size={14}/> Back</Btn>
-          {caption&&<Btn primary onClick={()=>setStep(4)} style={{flex:1,justifyContent:"center",padding:16,borderRadius:14}}>Preview Post <Eye size={14}/></Btn>}
+          {caption&&!generating&&<Btn primary onClick={()=>setStep(4)} style={{flex:1,justifyContent:"center",padding:16,borderRadius:14}}>Preview Post <Eye size={14}/></Btn>}
         </div>
       </div>}
 
