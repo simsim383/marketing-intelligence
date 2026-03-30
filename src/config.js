@@ -1,9 +1,10 @@
 // ═══════════════════════════════════════════════════════════════════
 // CONFIG — Marketing Intelligence
 // ═══════════════════════════════════════════════════════════════════
-// API key is now SERVER-SIDE ONLY via /api/generate-caption.js
-// In Vercel: add ANTHROPIC_KEY (no VITE_ prefix) to Environment Variables
-// The frontend calls /api/generate-caption — no key in the browser.
+// Supabase: same instance as Owner app — shares clients table
+// Anthropic: server-side only via /api/generate-caption.js
+// In Vercel: add VITE_SUPABASE_URL, VITE_SUPABASE_KEY, ANTHROPIC_KEY
 // ═══════════════════════════════════════════════════════════════════
 
-// No client-side API keys needed. All AI calls go through the serverless function.
+export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "";
+export const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY || "";
