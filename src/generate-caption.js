@@ -108,7 +108,7 @@ export default async function handler(req, res) {
 
   const apiKey = process.env.ANTHROPIC_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: 'ANTHROPIC_KEY not configured on server' });
+    return res.status(500).json({ error: 'ANTHROPIC_KEY not configured on server', detail: 'missing_key' });
   }
 
   try {
@@ -129,7 +129,7 @@ export default async function handler(req, res) {
     if (!response.ok) {
       const err = await response.text();
       console.error('Anthropic API error:', err);
-      return res.status(502).json({ error: 'AI generation failed' });
+      return res.status(502).json({ error: 'AI generation failed', detail: err.slice(0, 300) });
     }
 
     const data = await response.json();
@@ -138,6 +138,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ caption: text.trim() });
   } catch (err) {
     console.error('Server error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error', detail: err.message });
   }
 }
