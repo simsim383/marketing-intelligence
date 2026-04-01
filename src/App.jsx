@@ -41,49 +41,51 @@ const PREFERRED_DAYS=[0,2,4,5,1,3,6];
 const POSTING_TIMES={0:"9:00am",1:"12:00pm",2:"9:00am",3:"6:00pm",4:"9:00am",5:"11:00am",6:"5:00pm"};
 function autoSchedule(posts,existing={}){const sched={};const already=new Set(Object.values(existing).flat());const todo=posts.filter(p=>!already.has(p.id));todo.forEach((p,i)=>{const d=PREFERRED_DAYS[i%7];sched[d]=[...(sched[d]||[]),p.id];});const merged={...existing};Object.keys(sched).forEach(k=>{merged[k]=[...(merged[k]||[]),...sched[k]];});return merged;}
 
-// ─── IMAGE ENHANCEMENT — BLUR BACKGROUND (Section: new template system) ──
-function enhanceImage(src,price,storeName,tag){
+// ─── IMAGE ENHANCEMENT — BLUR BACKGROUND ────────────────────────
+// Clean style: no coloured badge overlays. Just the photo + subtle bottom bar.
+// Inspired by Horsley Hill Premier — the photo IS the post.
+function enhanceImage(src,price,storeName){
   return new Promise(resolve=>{
     const canvas=document.createElement("canvas"),ctx=canvas.getContext("2d"),img=new Image();
     img.onload=()=>{
       canvas.width=1080;canvas.height=1080;
       const size=Math.min(img.width,img.height);
       const sx=(img.width-size)/2,sy=(img.height-size)/2;
-      // 1. Draw blurred background (full bleed)
-      ctx.filter="blur(28px) brightness(0.6) saturate(1.3)";
+      // 1. Blurred background (full bleed)
+      ctx.filter="blur(28px) brightness(0.55) saturate(1.3)";
       ctx.drawImage(img,sx,sy,size,size,-40,-40,1160,1160);
       ctx.filter="none";
-      // 2. Draw sharp product centred (85% of canvas with rounded feel)
-      const pad=70;const pSize=1080-pad*2;
+      // 2. Sharp product centred with subtle shadow
+      const pad=60;const pSize=1080-pad*2;
       ctx.save();
-      ctx.shadowColor="rgba(0,0,0,0.5)";ctx.shadowBlur=40;ctx.shadowOffsetY=8;
-      ctx.beginPath();ctx.roundRect(pad,pad,pSize,pSize,20);ctx.clip();
-      ctx.filter="brightness(1.06) contrast(1.08) saturate(1.05)";
+      ctx.shadowColor="rgba(0,0,0,0.45)";ctx.shadowBlur=36;ctx.shadowOffsetY=6;
+      ctx.beginPath();ctx.roundRect(pad,pad,pSize,pSize,16);ctx.clip();
+      ctx.filter="brightness(1.07) contrast(1.06) saturate(1.04)";
       ctx.drawImage(img,sx,sy,size,size,pad,pad,pSize,pSize);
       ctx.filter="none";
       ctx.restore();
-      // 3. Tag badge (top-left)
-      if(tag){
-        const t=tag.label||"NEW IN";const tc=tag.color||"#16A34A";
-        ctx.font="bold 28px Arial";const tw=ctx.measureText(t).width;
-        const bw=tw+32,bh=46,bx=pad+16,by=pad+16;
-        ctx.fillStyle=tc;ctx.beginPath();ctx.roundRect(bx,by,bw,bh,10);ctx.fill();
-        ctx.fillStyle="#fff";ctx.textAlign="left";ctx.textBaseline="middle";
-        ctx.fillText(t,bx+16,by+bh/2);
-      }
-      // 4. Price badge (bottom-right)
-      if(price){
-        const pt=`£${price}`;ctx.font="bold 38px Arial";const pw=ctx.measureText(pt).width;
-        const pbw=pw+36,pbh=60,pbx=1080-pad-16-pbw,pby=1080-pad-16-pbh;
-        ctx.fillStyle="rgba(0,0,0,0.7)";ctx.beginPath();ctx.roundRect(pbx,pby,pbw,pbh,12);ctx.fill();
-        ctx.fillStyle="#fff";ctx.textAlign="center";ctx.textBaseline="middle";
-        ctx.fillText(pt,pbx+pbw/2,pby+pbh/2);
-      }
-      // 5. Store watermark (bottom-left, subtle)
-      if(storeName){
-        ctx.fillStyle="rgba(255,255,255,0.5)";ctx.font="600 20px Arial";
-        ctx.textAlign="left";ctx.textBaseline="bottom";
-        ctx.fillText("📍 "+storeName,pad+16,1080-pad-16);
+      // 3. Clean bottom bar — only if we have something to show
+      const hasBar=price||storeName;
+      if(hasBar){
+        const barH=price?90:64;
+        const barY=1080-pad-barH;
+        // Semi-transparent dark bar
+        ctx.fillStyle="rgba(0,0,0,0.72)";
+        ctx.beginPath();ctx.roundRect(pad,barY,pSize,barH,12);ctx.fill();
+        if(price){
+          // Price — large and prominent
+          ctx.fillStyle="#ffffff";ctx.font="bold 46px Arial";
+          ctx.textAlign="left";ctx.textBaseline="middle";
+          ctx.fillText(`£${price}`,pad+24,barY+barH/2-(storeName?12:0));
+        }
+        if(storeName){
+          // Store name — smaller, below price or centred if no price
+          ctx.fillStyle="rgba(255,255,255,0.65)";ctx.font="500 20px Arial";
+          ctx.textAlign=price?"left":"center";ctx.textBaseline="middle";
+          const storeX=price?pad+24:(pad+pSize/2);
+          const storeY=price?barY+barH-22:barY+barH/2;
+          ctx.fillText("📍 "+storeName,storeX,storeY);
+        }
       }
       resolve(canvas.toDataURL("image/jpeg",0.92));
     };
@@ -321,6 +323,33 @@ function HubView({storeName,posts,schedule,onCreateNew,onBatch,onEdit,onSchedule
 // ═══ POST CARD ══════════════════════════════════════════════════
 function PostCard({post,isScheduled,onEdit,onDelete}){const[copied,setCopied]=useState(false);const cc=e=>{e.stopPropagation();navigator.clipboard.writeText(post.caption).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2000);});};const isVideo=post.mediaType==="video";return<div style={{background:C.surface,borderRadius:12,overflow:"hidden",border:`1px solid ${C.border}`}}><div style={{display:"flex",gap:12,padding:12}}>{post.imageUrl&&<div style={{width:56,height:56,borderRadius:8,overflow:"hidden",flexShrink:0,background:C.card,position:"relative"}}>{isVideo?<div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",background:C.card}}><Film size={20} color={C.purple}/></div>:<img src={post.imageUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>}</div>}<div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:700,color:C.white,marginBottom:3}}>{post.productName||"Untitled"}{isVideo&&<Badge color={C.purple} style={{fontSize:7,padding:"1px 5px",marginLeft:6}}>VIDEO</Badge>}</div><div style={{fontSize:11,color:C.dim,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:5}}>{post.caption?.slice(0,70)}…</div><div style={{display:"flex",gap:4,flexWrap:"wrap"}}><Badge color={C.green} style={{fontSize:8,padding:"2px 7px"}}>{CAPTION_STYLES.find(s=>s.id===post.style)?.label||post.style}</Badge>{isScheduled&&<Badge color={C.blue} style={{fontSize:8,padding:"2px 7px"}}>Scheduled</Badge>}</div></div></div><div style={{display:"flex",borderTop:`1px solid ${C.border}`}}>{[{icon:<Edit3 size={11}/>,label:"Edit",fn:onEdit,color:C.blue},{icon:copied?<Check size={11}/>:<Copy size={11}/>,label:copied?"Copied!":"Copy",fn:cc,color:C.green},{icon:<ExternalLink size={11}/>,label:"Facebook",fn:()=>{navigator.clipboard.writeText(post.caption);setTimeout(()=>window.open("https://www.facebook.com","_blank"),300);},color:C.blue},{icon:<Trash2 size={11}/>,label:"Delete",fn:e=>{e.stopPropagation();onDelete();},color:C.red}].map((a,idx)=><button key={a.label} onClick={a.fn} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:4,padding:"10px 0",background:"none",border:"none",borderRight:idx<3?`1px solid ${C.border}`:"none",color:a.color,fontSize:10,fontWeight:600,cursor:"pointer",fontFamily:FONT}}>{a.icon} {a.label}</button>)}</div></div>;}
 
+// ═══ PHOTO TIPS ═════════════════════════════════════════════════
+// Based on what actually performs well — Horsley Hill Premier style
+function PhotoTips({onDismiss}){
+  const tips=[
+    {icon:"📦",good:"Line up 3–4 units side by side on the till conveyor",bad:"Single unit floating on a plain surface"},
+    {icon:"💡",good:"Face a window — natural light makes everything look better",bad:"Dark shelf photo or ceiling lights causing glare"},
+    {icon:"📸",good:"Get low and level with the product — fill the frame",bad:"Top-down shot or product too small in frame"},
+    {icon:"🏪",good:"Store shelving blurred in background looks professional automatically",bad:"Messy background — let the blur do the work"},
+  ];
+  return<div style={{background:C.surface,borderRadius:14,padding:16,marginBottom:16,border:`1px solid ${C.purple}33`}}>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+      <div style={{fontSize:12,fontWeight:800,color:C.white,display:"flex",alignItems:"center",gap:6}}><span>📷</span> How to get a great photo</div>
+      <button onClick={onDismiss} style={{background:"none",border:"none",color:C.dim,cursor:"pointer",padding:2}}><X size={14}/></button>
+    </div>
+    {tips.map((t,i)=><div key={i} style={{marginBottom:i<tips.length-1?10:0}}>
+      <div style={{display:"flex",gap:8,marginBottom:3}}>
+        <span style={{fontSize:14,flexShrink:0}}>{t.icon}</span>
+        <div style={{fontSize:12,color:C.green,fontWeight:600,lineHeight:1.4}}>✓ {t.good}</div>
+      </div>
+      <div style={{paddingLeft:22,fontSize:11,color:C.dim,lineHeight:1.4}}>✕ {t.bad}</div>
+    </div>)}
+    <div style={{marginTop:12,padding:"8px 12px",borderRadius:8,background:C.purpleDim,border:`1px solid ${C.purple}22`}}>
+      <div style={{fontSize:11,color:C.purple,fontWeight:600,lineHeight:1.5}}>💡 Pro tip: Real photos outsell designed graphics every time. Line them up, snap it, done.</div>
+    </div>
+  </div>;
+}
+
 // ═══ CREATE VIEW ════════════════════════════════════════════════
 function CreateView({post:ep,storeName,onSave,onBack}){
   const[step,setStep]=useState(1);const cameraRef=useRef(null);const libraryRef=useRef(null);
@@ -334,11 +363,12 @@ function CreateView({post:ep,storeName,onSave,onBack}){
   const[generating,setGenerating]=useState(false);
   const[showBranding,setShowBranding]=useState(ep?.showBranding!==false);
   const[mediaType,setMediaType]=useState(ep?.mediaType||"image");
+  const[showTips,setShowTips]=useState(!ep);
 
-  const handleFile=(e)=>{const f=e.target.files?.[0];if(!f)return;const isVid=f.type.startsWith("video/");setMediaType(isVid?"video":"image");if(isVid){setImageUrl(URL.createObjectURL(f));setEnhancedUrl(null);return;}const r=new FileReader();r.onload=ev=>{setImageUrl(ev.target.result);enhanceImage(ev.target.result,price,storeName,tag).then(setEnhancedUrl).catch(()=>setEnhancedUrl(ev.target.result));};r.readAsDataURL(f);};
+  const handleFile=(e)=>{const f=e.target.files?.[0];if(!f)return;const isVid=f.type.startsWith("video/");setMediaType(isVid?"video":"image");if(isVid){setImageUrl(URL.createObjectURL(f));setEnhancedUrl(null);return;}const r=new FileReader();r.onload=ev=>{setImageUrl(ev.target.result);enhanceImage(ev.target.result,price,storeName).then(setEnhancedUrl).catch(()=>setEnhancedUrl(ev.target.result));};r.readAsDataURL(f);};
 
-  // Re-enhance when price/tag changes
-  useEffect(()=>{if(imageUrl&&mediaType==="image"&&price)enhanceImage(imageUrl,price,storeName,tag).then(setEnhancedUrl).catch(()=>{});},[price,tag]);
+  // Re-enhance when price changes
+  useEffect(()=>{if(imageUrl&&mediaType==="image")enhanceImage(imageUrl,price,storeName).then(setEnhancedUrl).catch(()=>{});},[price]);
 
   // Style-specific fallback captions — multiple variants per style so regenerate gives different output
   const[apiError,setApiError]=useState(null);
@@ -347,34 +377,37 @@ function CreateView({post:ep,storeName,onSave,onBack}){
     const p=price?`£${price}`:"";const n=productName;const s=storeName||"our shop";
     const variants={
       hype_drop:[
-        `🚨 IT'S BACK... AND FLYING OUT AGAIN! 🚨\n\n${n} is BACK IN STOCK 🔥${p?` MAX 2 PER CUSTOMER ‼️`:""}\n(Sold out last week... and we know what's about to happen again 👀)\n\nBe quick... once it's gone, it's GONE again!\n\n📍 ${s}\n\n#ConvenienceStore #Deals ${t}`,
-        `🔥🔥 ${n.toUpperCase()} 🔥🔥\n\nYou've been ASKING for this and it's FINALLY HERE ‼️\n${p?`Just ${p} — `:""}\nEveryone's going mad for it 👀\n\nWe're not joking — this WILL sell out. Get in quick!\n\n📍 ${s}\n\n#Trending #MustHave ${t}`,
-        `👀 You lot aren't ready for this...\n\n${n} just dropped and it's already FLYING OFF THE SHELVES 🔥\n${p?`Only ${p}!! `:""}\n\nLast time we got these in? GONE in 2 days.\n\nDon't say we didn't warn you ‼️\n\n📍 ${s}\n\n#GetItBeforeItsGone ${t}`,
+        `🔥 ${n} — FLYING OUT!!\n\n${p?`Just ${p} `:""} In Store NOW!\n\nDon't sleep on this one — last time it was gone in days 👀\n\nBe quick!! ${t}`,
+        `${n} is BACK and it's going MENTAL 🔥${p?`\nOnly ${p}!!`:""}\n\nIn Store NOW at ${s} — Be Quick Before It's GONE!!\n\n${t} #fyp`,
+        `🚨 ${n.toUpperCase()} 🚨${p?`\nJust ${p}!!`:""}\n\nEveryone's been asking... and it's FINALLY HERE 👀\n\nIn Store Only — Grab Yours Before They're Gone!!\n\n${t}`,
       ],
       new_arrival:[
-        `🍫 NEW ${n.toUpperCase()} 🍫\n\nJust landed at ${s}!! 😱\n\n${n} *AVAILABLE* Now!! 😋${p?`\nJust ${p}`:""}\n\nBe Quick As They're Flying Out!! ⏳\n\n📍 ${s}\n\n#NewIn #ConvenienceStore ${t}`,
-        `👀 JUST IN!!\n\n${n} has landed at ${s}!${p?` Only ${p}!`:""}\n\nBrand new to the shop and looking 🔥\n\nCome grab yours before everyone else does!\n\n📍 ${s}\n\n#NewArrival #JustLanded ${t}`,
-        `🆕 NEW NEW NEW 🆕\n\n${n} is NOW IN STORE at ${s}!!${p?`\n${p} — absolute steal`:""}\n\nAnother new addition to the shelves 😍 Be quick — new stock never lasts long!\n\n📍 ${s}\n\n#NewIn #FreshStock ${t}`,
+        `${n} Now In Store! 🛒${p?`\nJust ${p}`:""}\n\nNow Available At ${s}!!\n\nBe Quick As They're Flying Out!! ⏳\n\n${t} #NewIn`,
+        `NEW!! ${n}${p?` — Only ${p}`:""} 🔥\n\nJust Landed At ${s}!\n\nIn Store Now — Come Grab Yours!! 😋\n\n${t}`,
+        `👀 NEW ${n} Now Available!\n\n${p?`Just ${p} `:""}In Store Only At ${s}!!\n\nFresh Stock — Be Quick!! \n\n${t} #JustLanded`,
       ],
       price_hero:[
-        `${n} Now At ${s}!\n${p?`Only ${p}`:""} 🔥\nIn Store Now! Be Quick!!\n\nGrab It While Stock Last!\n\n#ConvenienceStore #Deals ${t} #fyp`,
+        `${n}!\n${p?`Just ${p} — `:""} Instore Only 🔥\n\nGrab It While Stock Lasts!!\n\n${t} #Deals`,
+        `${p?`${p} — `:""} ${n}!\n\nIn Store Now At ${s}!\n\nYou Won't Find It Cheaper Locally 👀 Be Quick!!\n\n${t}`,
+        `${n}${p?` Just ${p}!!`:""} 💰\n\nIn Store Only — ${s}\n\nDon't Miss This One!! Flying Out!!\n\n${t} #PriceDrop`,
+      ],
         `💰 DEAL ALERT 💰\n\n${n}${p?` — JUST ${p}!!`:""}\n\nYou won't find this cheaper locally. In store NOW at ${s}\n\nGrab it before it's gone!\n\n#BargainAlert #Deals ${t}`,
-        `${p?`${p} — `:""} yes, you read that right 👀\n\n${n} now available at ${s}!\n\nAbsolute bargain. In store now — be quick!!\n\n#PriceDrop #Value ${t}`,
+        `${p?`${p} — `:""} yes, you read that right 👀\n\n${n} now available at ${s}!\n\nIn Store Only — Be Quick!!\n\n#PriceDrop ${t}`,
       ],
       local_shoutout:[
-        `You asked, we listened 👏\n\n${n} is now available at ${s}!${p?` Just ${p}.`:""}\n\nPop into the store and grab yours 🎁\n\nThank you to everyone who keeps coming back — you lot are the best 👀✨\n\n📍 ${s}\n\n#LocalShop #SupportLocal ${t}`,
-        `This one's for our regulars 💜\n\nWe know you've been asking about ${n}${p?` (${p})`:""} — well it's HERE!\n\nCome say hello and grab one while you're at it 😊\n\n📍 ${s}\n\n#CommunityShop #YourLocalShop ${t}`,
-        `Another one for the ${s} family ❤️\n\n${n} is in and ready for you!${p?` Just ${p}.`:""}\n\nWe love stocking what YOU want to see — keep the suggestions coming!\n\nPop in anytime 📍\n\n#ThankYou #LocalLove ${t}`,
+        `You asked, we listened 👏\n\n${n} is now available at ${s}!${p?` Just ${p}.`:""}\n\nPop into the store and grab yours 🎁\n\nThank you for your support — you lot are the best ✨\n\n${t} #LocalShop`,
+        `This one's for our regulars 💜\n\n${n}${p?` — Just ${p}`:""} Now In Store!\n\nCome say hello and grab one while you're at it 😊\n\n${t} #YourLocalShop`,
+        `${n} Is Here And It's For You ❤️\n\n${p?`Just ${p} `:""} In Store Now At ${s}!\n\nWe love stocking what YOU want — keep the suggestions coming!\n\n${t} #LocalLove`,
       ],
       weekend_vibe:[
-        `Perfect for tonight 👌\n\n${n}${p?` — just ${p}`:""}\n\nSweet, refreshing & made for the weekend vibes 🙌\n\nWhether you're chilling at home or stocking up for a get-together... don't miss this!\n\n📍 ${s}\n\n#WeekendVibes #FridayFeeling ${t}`,
-        `Weekend sorted? Not yet... 👀\n\n${n} is waiting for you at ${s}${p?` — only ${p}`:""}\n\nThe perfect grab for tonight 🍻\n\nPop in on your way home!\n\n📍 ${s}\n\n#WeekendReady #TreatYourself ${t}`,
-        `🎉 WEEKEND INCOMING 🎉\n\n${n}${p?` just ${p}`:""} — grab it and go!\n\nYou deserve a treat this weekend. We've got you covered 😎\n\n📍 ${s}\n\n#SaturdayVibes #WeekendTreats ${t}`,
+        `Perfect For Tonight 👌\n\n${n}${p?` — Just ${p}`:""}\n\nIn Store Now At ${s} 🍻\n\nGrab It On Your Way Home!!\n\n${t} #WeekendVibes`,
+        `Weekend Ready? 👀\n\n${n}${p?` — Only ${p}`:""} At ${s}!\n\nPerfect For The Weekend 🙌\n\nIn Store Now — Don't Miss It!!\n\n${t} #FridayFeeling`,
+        `${n}${p?` Just ${p}`:""} — The Perfect Weekend Grab 🎉\n\nIn Store Now At ${s}!\n\nTreat Yourself This Weekend 😎\n\n${t} #WeekendTreats`,
       ],
       staff_pick:[
-        `Honestly? This one caught us off guard 👏\n\n${n}${p?` — ${p}`:""}\n\nWe've been trying everything new that comes in and THIS is the one. Trust us.\n\nGive it a try — you won't regret it 🔥\n\n📍 ${s}\n\n#StaffPick #TryThis ${t}`,
-        `⭐ STAFF PICK OF THE WEEK ⭐\n\n${n}${p?` (${p})`:""}\n\nThe team can't stop talking about this one 😍\n\nSeriously — if you haven't tried it yet, what are you waiting for?!\n\n📍 ${s}\n\n#Recommended #WeTriedIt ${t}`,
-        `Right, we need to talk about ${n} 👀\n\n${p?`${p} and worth `:""} every penny.\n\nThe whole team agrees — this is a must-try. Don't just take our word for it, come see for yourself!\n\n📍 ${s}\n\n#StaffFavourite #MustTry ${t}`,
+        `${n}${p?` — ${p}`:""} 🔥\n\nWe Had To Try It — And It Did NOT Disappoint!!\n\nIn Store Now At ${s} — Trust Us On This One 👏\n\n${t} #StaffPick`,
+        `⭐ Staff Pick Of The Week ⭐\n\n${n}${p?` (${p})`:""}\n\nThe Whole Team Agrees — This Is A Must Try 😍\n\nIn Store Now!!\n\n${t} #Recommended`,
+        `Right, We Need To Talk About ${n} 👀\n\n${p?`${p} and worth every penny.`:""}\n\nIn Store At ${s} — Come See For Yourself!!\n\n${t} #StaffFavourite`,
       ],
     };
     const list=variants[useStyle]||variants.new_arrival;
@@ -403,7 +436,7 @@ function CreateView({post:ep,storeName,onSave,onBack}){
 
   const save=()=>onSave({id:ep?.id||`post_${Date.now()}`,imageUrl:enhancedUrl||imageUrl,productName,price,tag,style,caption,showBranding,mediaType,createdAt:ep?.createdAt||new Date().toISOString()});
 
-  const steps=[{n:1,l:"Photo",i:<Camera size={11}/>},{n:2,l:"Style",i:<LayoutTemplate size={11}/>},{n:3,l:"Caption",i:<Type size={11}/>},{n:4,l:"Preview",i:<Eye size={11}/>}];
+  const steps=[{n:1,l:"Photo",i:<Camera size={11}/>},{n:2,l:"Preview",i:<Eye size={11}/>},{n:3,l:"Caption",i:<Type size={11}/>},{n:4,l:"Post",i:<ExternalLink size={11}/>}];
   const wc=caption.split(/\s+/).filter(Boolean).length;
   const img=enhancedUrl||imageUrl;
 
@@ -411,15 +444,16 @@ function CreateView({post:ep,storeName,onSave,onBack}){
     <div style={{padding:"14px 20px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{display:"flex",alignItems:"center",gap:10}}><button onClick={onBack} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",padding:4}}><ChevronLeft size={20}/></button><span style={{fontSize:15,fontWeight:700,color:C.white}}>{ep?"Edit Post":"Create Post"}</span></div>{step===4&&<Btn primary small onClick={save}><Check size={12}/> Save</Btn>}</div>
     <div style={{padding:"10px 20px",display:"flex",gap:2,justifyContent:"center",background:C.card,borderBottom:`1px solid ${C.border}`}}>{steps.map(s=><button key={s.n} onClick={()=>{if(s.n<step)setStep(s.n);}} style={{display:"flex",alignItems:"center",gap:4,padding:"7px 16px",borderRadius:8,border:"none",background:step===s.n?C.purpleDim:"transparent",color:step===s.n?C.purple:step>s.n?C.green:C.dim,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:FONT}}>{step>s.n?<Check size={10} strokeWidth={3}/>:s.i}<span>{s.l}</span></button>)}</div>
     <div style={{padding:20,maxWidth:500,margin:"0 auto"}}>
-      {/* STEP 1: Photo — camera vs library + video support */}
+      {/* STEP 1: Photo */}
       {step===1&&<div className="fade-up">
         <input ref={cameraRef} type="file" accept="image/*,video/*" capture="environment" onChange={handleFile} style={{display:"none"}}/>
         <input ref={libraryRef} type="file" accept="image/*,video/*" onChange={handleFile} style={{display:"none"}}/>
+        {showTips&&!imageUrl&&<PhotoTips onDismiss={()=>setShowTips(false)}/>}
         {!imageUrl?<>
           <Card style={{textAlign:"center",padding:40,marginBottom:10}}>
             <div style={{width:72,height:72,borderRadius:18,margin:"0 auto 20px",background:C.purpleDim,display:"flex",alignItems:"center",justifyContent:"center"}}><Camera size={32} color={C.purple}/></div>
             <div style={{fontSize:16,fontWeight:800,color:C.white,marginBottom:6,fontFamily:DISPLAY}}>Add a product photo or video</div>
-            <div style={{fontSize:12,color:C.dim,lineHeight:1.6,marginBottom:20}}>Photos auto-enhance to 1080×1080 with blurred background.</div>
+            <div style={{fontSize:12,color:C.dim,lineHeight:1.6,marginBottom:20}}>Line up 3–4 units, good light, fill the frame.<br/>Background blurs automatically to 1080×1080.</div>
             <div style={{display:"flex",gap:8,justifyContent:"center"}}>
               <Btn primary onClick={()=>cameraRef.current?.click()} style={{borderRadius:12}}><Camera size={14}/> Take Photo</Btn>
               <Btn onClick={()=>libraryRef.current?.click()} style={{borderRadius:12}}><ImagePlus size={14}/> Choose from Library</Btn>
@@ -437,17 +471,25 @@ function CreateView({post:ep,storeName,onSave,onBack}){
             <input value={price} onChange={e=>setPrice(e.target.value)} placeholder="Price — optional (e.g. 1.99)" style={{width:"100%",padding:"13px 14px",borderRadius:10,background:C.surface,color:C.white,border:`1px solid ${C.border}`,fontSize:14,outline:"none",fontFamily:FONT,boxSizing:"border-box"}}/>
           </Card>
         </>}
-        {imageUrl&&productName&&<Btn primary onClick={()=>setStep(2)} style={{width:"100%",justifyContent:"center",padding:16,borderRadius:14}}>Next: Choose Style <ArrowRight size={14}/></Btn>}
+        {imageUrl&&productName&&<Btn primary onClick={()=>setStep(2)} style={{width:"100%",justifyContent:"center",padding:16,borderRadius:14}}>Next: Preview Image <ArrowRight size={14}/></Btn>}
       </div>}
 
-      {/* STEP 2: Tag selection (blur bg is automatic — just pick the overlay tag) */}
+      {/* STEP 2: Image preview + branding toggle */}
       {step===2&&<div className="fade-up">
-        <SectionLabel style={{marginBottom:12}}>Choose a tag for your post</SectionLabel>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:20}}>
-          {TEMPLATE_TAGS.map(t=><button key={t.id} onClick={()=>setTag(t)} style={{padding:"14px 8px",borderRadius:14,border:tag.id===t.id?`2.5px solid ${C.purple}`:`2px solid ${C.border}`,background:tag.id===t.id?C.purpleDim:C.surface,cursor:"pointer",textAlign:"center",transition:"all 0.2s",transform:tag.id===t.id?"scale(1.03)":"scale(1)"}}><div style={{fontSize:11,fontWeight:800,color:t.color,marginBottom:2}}>{t.label}</div><div style={{fontSize:8,color:C.dim}}>{t.style}</div></button>)}
+        <SectionLabel style={{marginBottom:12}}>Your post image</SectionLabel>
+        {mediaType==="image"&&img&&<Card style={{marginBottom:14,padding:0,overflow:"hidden",borderRadius:14}}>
+          <img src={img} alt="" style={{width:"100%",maxHeight:360,objectFit:"cover",display:"block"}}/>
+          <div style={{padding:"10px 14px",background:C.surface,borderTop:`1px solid ${C.border}`}}>
+            <div style={{fontSize:11,color:C.dim,lineHeight:1.5}}>
+              {price?<span style={{color:C.green,fontWeight:700}}>✓ Price bar added — £{price} will show on image</span>:<span>💡 Go back and add a price to show it on the image</span>}
+            </div>
+          </div>
+        </Card>}
+        {mediaType==="video"&&<Card style={{marginBottom:14,padding:24,textAlign:"center"}}><Film size={32} color={C.purple} style={{marginBottom:8}}/><div style={{fontSize:12,color:C.dim}}>Video ready — caption will be added when posting</div></Card>}
+        <Card style={{marginBottom:14}}><SectionLabel>Options</SectionLabel><Toggle value={showBranding} onChange={setShowBranding} label="Show store name on image"/></Card>
+        <div style={{padding:"10px 14px",borderRadius:10,background:C.surface,border:`1px solid ${C.border}`,marginBottom:16}}>
+          <div style={{fontSize:11,color:C.dim,lineHeight:1.6}}>📸 <strong style={{color:C.muted}}>Photo tip:</strong> Real shelf photos perform better than anything designed. Line up 3–4 units, good light, fill the frame.</div>
         </div>
-        <Card style={{marginBottom:14}}><SectionLabel>Options</SectionLabel><Toggle value={showBranding} onChange={setShowBranding} label="Show store branding"/></Card>
-        {mediaType==="image"&&img&&<Card style={{marginBottom:18,padding:0,overflow:"hidden"}}><img src={img} alt="" style={{width:"100%",maxHeight:320,objectFit:"cover"}}/></Card>}
         <div style={{display:"flex",gap:8}}>
           <Btn onClick={()=>setStep(1)} style={{padding:14,borderRadius:12}}><ChevronLeft size={14}/> Back</Btn>
           <Btn primary onClick={()=>{setStep(3);if(!caption)genCaption();}} style={{flex:1,justifyContent:"center",padding:16,borderRadius:14}}>Next: AI Caption <Sparkles size={14}/></Btn>
@@ -465,7 +507,7 @@ function CreateView({post:ep,storeName,onSave,onBack}){
         {!generating&&<Btn onClick={()=>genCaption()} style={{width:"100%",justifyContent:"center",padding:14,borderRadius:12,background:C.purpleDim,color:C.purple,border:`1px solid ${C.purple}33`,marginBottom:14}}>
           <Wand2 size={14}/> {caption?"Regenerate":"Generate"}
         </Btn>}
-        <div style={{position:"relative"}}><textarea value={caption} onChange={e=>setCaption(e.target.value)} placeholder="Your AI caption will appear here — or write your own…" rows={8} style={{width:"100%",padding:16,borderRadius:14,background:C.surface,color:C.white,border:`1px solid ${C.border}`,fontSize:13,lineHeight:1.7,outline:"none",fontFamily:FONT,resize:"vertical",boxSizing:"border-box"}}/><div style={{position:"absolute",bottom:8,right:12,fontSize:10,color:wc>150?C.red:C.dim,fontWeight:600}}>{wc}/150 words</div></div>
+        <div style={{position:"relative"}}><textarea value={caption} onChange={e=>setCaption(e.target.value)} placeholder="Your AI caption will appear here — or write your own…" rows={8} style={{width:"100%",padding:16,borderRadius:14,background:C.surface,color:C.white,border:`1px solid ${C.border}`,fontSize:13,lineHeight:1.7,outline:"none",fontFamily:FONT,resize:"vertical",boxSizing:"border-box"}}/><div style={{position:"absolute",bottom:8,right:12,fontSize:10,color:wc>80?C.red:C.dim,fontWeight:600}}>{wc}/80 words</div></div>
         <div style={{display:"flex",gap:8,marginTop:14}}>
           <Btn onClick={()=>setStep(2)} style={{padding:14,borderRadius:12}}><ChevronLeft size={14}/> Back</Btn>
           {caption&&!generating&&<Btn primary onClick={()=>setStep(4)} style={{flex:1,justifyContent:"center",padding:16,borderRadius:14}}>Preview Post <Eye size={14}/></Btn>}
@@ -496,7 +538,7 @@ function BatchView({storeName,onSave,onBack}){
   const[step,setStep]=useState("upload");const[images,setImages]=useState([]);const[captions,setCaptions]=useState({});const[progress,setProgress]=useState(0);const fileRef=useRef(null);
   const handleFiles=e=>{const files=Array.from(e.target.files||[]).slice(0,7);Promise.all(files.map((f,i)=>{const id=`batch_${Date.now()}_${i}`;const isVid=f.type.startsWith("video/");return new Promise(resolve=>{if(isVid){resolve({id,rawUrl:URL.createObjectURL(f),name:"",price:"",mediaType:"video"});}else{const r=new FileReader();r.onload=ev=>resolve({id,rawUrl:ev.target.result,name:"",price:"",mediaType:"image"});r.readAsDataURL(f);}});})).then(imgs=>{setImages(imgs);setStep("name");});};
   const genAll=async()=>{setStep("generating");setProgress(0);const res={};for(let i=0;i<images.length;i++){const img=images[i];const sid=CAPTION_STYLES[i%CAPTION_STYLES.length].id;try{const r=await fetch("/api/generate-caption",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({productName:img.name,price:img.price,storeName,style:sid})});const d=await r.json();res[img.id]=d.caption||fb(img,storeName);}catch{res[img.id]=fb(img,storeName);}setProgress(i+1);}setCaptions(res);setStep("review");};
-  const saveAll=async()=>{const newPosts=[];for(const img of images){let enh=img.rawUrl;if(img.mediaType==="image")try{enh=await enhanceImage(img.rawUrl,img.price,storeName,TEMPLATE_TAGS[0]);}catch{}newPosts.push({id:img.id,imageUrl:enh,productName:img.name,price:img.price,tag:TEMPLATE_TAGS[0],style:CAPTION_STYLES[newPosts.length%CAPTION_STYLES.length].id,caption:captions[img.id]||"",showBranding:true,mediaType:img.mediaType,createdAt:new Date().toISOString()});}onSave(newPosts,autoSchedule(newPosts));};
+  const saveAll=async()=>{const newPosts=[];for(const img of images){let enh=img.rawUrl;if(img.mediaType==="image")try{enh=await enhanceImage(img.rawUrl,img.price,storeName);}catch{}newPosts.push({id:img.id,imageUrl:enh,productName:img.name,price:img.price,tag:TEMPLATE_TAGS[0],style:CAPTION_STYLES[newPosts.length%CAPTION_STYLES.length].id,caption:captions[img.id]||"",showBranding:true,mediaType:img.mediaType,createdAt:new Date().toISOString()});}onSave(newPosts,autoSchedule(newPosts));};
 
   return<div style={{minHeight:"100vh",background:C.bg,fontFamily:FONT,color:C.text}}>
     <div style={{padding:"14px 20px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:10}}><button onClick={onBack} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",padding:4}}><ChevronLeft size={20}/></button><div><div style={{fontSize:15,fontWeight:700,color:C.white}}>Plan My Week</div><div style={{fontSize:11,color:C.dim}}>Upload up to 7 products</div></div></div>
