@@ -340,33 +340,59 @@ function CreateView({post:ep,storeName,onSave,onBack}){
   // Re-enhance when price/tag changes
   useEffect(()=>{if(imageUrl&&mediaType==="image"&&price)enhanceImage(imageUrl,price,storeName,tag).then(setEnhancedUrl).catch(()=>{});},[price,tag]);
 
-  // Style-specific fallback captions (used when API fails) — modelled on real shop posts
+  // Style-specific fallback captions — multiple variants per style so regenerate gives different output
+  const[apiError,setApiError]=useState(null);
   const buildFallback=(useStyle)=>{
     const t=storeName?`#${storeName.replace(/\s/g,"").toLowerCase()}`:"#localshop";
-    const p=price?`£${price}`:"";
-    const fb={
-      hype_drop:`🚨 IT'S BACK... AND FLYING OUT AGAIN! 🚨\n\n${productName} is BACK IN STOCK 🔥${p?` MAX 2 PER CUSTOMER ‼️`:""}\n(Sold out last week... and we know what's about to happen again 👀)\n\nThis one's been going CRAZY — everyone's talking about it!\n\nBe quick... once it's gone, it's GONE again!\n\n📍 ${storeName||"Pop in store"}\n\n#ConvenienceStore #Deals ${t}`,
-      new_arrival:`🍫 NEW ${productName.toUpperCase()} 🍫\n\nJust landed at ${storeName||"the shop"}!! 😱\n\n${productName} *AVAILABLE* Now!! 😋${p?`\nJust ${p}`:""}\n\nBe Quick As They're Flying Out!! ⏳\n\n📍 ${storeName||"In store now"}\n\n#NewIn #ConvenienceStore ${t}`,
-      price_hero:`${productName} Now At ${storeName||"Our Store"}!\n${p?`Only ${p} 🇬🇧`:""}\nIn Store Now! Be Quick!!\n\nGrab It While Stock Last!\n\n#ConvenienceStore #Deals ${t} #fyp`,
-      local_shoutout:`You asked, we listened 👏\n\n${productName} is now available at ${storeName||"our shop"}!${p?` Just ${p}.`:""}\n\nPop into the store and grab yours 🎁\n\nA big thank you to everyone who keeps coming back — you lot are the best 👀✨\n\n📍 ${storeName||"Come see us"}\n\n#LocalShop #SupportLocal ${t}`,
-      weekend_vibe:`Perfect for tonight 👌\n\n${productName}${p?` — just ${p}`:""}\n\nSweet, refreshing & made for the weekend vibes 🙌\n\nJust in time for the weekend! Whether you're chilling at home or stocking up for a get-together... don't miss this!\n\n📍 ${storeName||"Available now"}\n\n#WeekendVibes #Drinks ${t}`,
-      staff_pick:`Honestly? This one caught us off guard 👏\n\n${productName}${p?` — ${p}`:""}\n\nWe've been trying everything new that comes in and THIS is the one. Trust us on this.\n\nGive it a try — you won't regret it 🔥\n\n📍 ${storeName||"In store"}\n\n#StaffPick #TryThis ${t}`,
+    const p=price?`£${price}`:"";const n=productName;const s=storeName||"our shop";
+    const variants={
+      hype_drop:[
+        `🚨 IT'S BACK... AND FLYING OUT AGAIN! 🚨\n\n${n} is BACK IN STOCK 🔥${p?` MAX 2 PER CUSTOMER ‼️`:""}\n(Sold out last week... and we know what's about to happen again 👀)\n\nBe quick... once it's gone, it's GONE again!\n\n📍 ${s}\n\n#ConvenienceStore #Deals ${t}`,
+        `🔥🔥 ${n.toUpperCase()} 🔥🔥\n\nYou've been ASKING for this and it's FINALLY HERE ‼️\n${p?`Just ${p} — `:""}\nEveryone's going mad for it 👀\n\nWe're not joking — this WILL sell out. Get in quick!\n\n📍 ${s}\n\n#Trending #MustHave ${t}`,
+        `👀 You lot aren't ready for this...\n\n${n} just dropped and it's already FLYING OFF THE SHELVES 🔥\n${p?`Only ${p}!! `:""}\n\nLast time we got these in? GONE in 2 days.\n\nDon't say we didn't warn you ‼️\n\n📍 ${s}\n\n#GetItBeforeItsGone ${t}`,
+      ],
+      new_arrival:[
+        `🍫 NEW ${n.toUpperCase()} 🍫\n\nJust landed at ${s}!! 😱\n\n${n} *AVAILABLE* Now!! 😋${p?`\nJust ${p}`:""}\n\nBe Quick As They're Flying Out!! ⏳\n\n📍 ${s}\n\n#NewIn #ConvenienceStore ${t}`,
+        `👀 JUST IN!!\n\n${n} has landed at ${s}!${p?` Only ${p}!`:""}\n\nBrand new to the shop and looking 🔥\n\nCome grab yours before everyone else does!\n\n📍 ${s}\n\n#NewArrival #JustLanded ${t}`,
+        `🆕 NEW NEW NEW 🆕\n\n${n} is NOW IN STORE at ${s}!!${p?`\n${p} — absolute steal`:""}\n\nAnother new addition to the shelves 😍 Be quick — new stock never lasts long!\n\n📍 ${s}\n\n#NewIn #FreshStock ${t}`,
+      ],
+      price_hero:[
+        `${n} Now At ${s}!\n${p?`Only ${p}`:""} 🔥\nIn Store Now! Be Quick!!\n\nGrab It While Stock Last!\n\n#ConvenienceStore #Deals ${t} #fyp`,
+        `💰 DEAL ALERT 💰\n\n${n}${p?` — JUST ${p}!!`:""}\n\nYou won't find this cheaper locally. In store NOW at ${s}\n\nGrab it before it's gone!\n\n#BargainAlert #Deals ${t}`,
+        `${p?`${p} — `:""} yes, you read that right 👀\n\n${n} now available at ${s}!\n\nAbsolute bargain. In store now — be quick!!\n\n#PriceDrop #Value ${t}`,
+      ],
+      local_shoutout:[
+        `You asked, we listened 👏\n\n${n} is now available at ${s}!${p?` Just ${p}.`:""}\n\nPop into the store and grab yours 🎁\n\nThank you to everyone who keeps coming back — you lot are the best 👀✨\n\n📍 ${s}\n\n#LocalShop #SupportLocal ${t}`,
+        `This one's for our regulars 💜\n\nWe know you've been asking about ${n}${p?` (${p})`:""} — well it's HERE!\n\nCome say hello and grab one while you're at it 😊\n\n📍 ${s}\n\n#CommunityShop #YourLocalShop ${t}`,
+        `Another one for the ${s} family ❤️\n\n${n} is in and ready for you!${p?` Just ${p}.`:""}\n\nWe love stocking what YOU want to see — keep the suggestions coming!\n\nPop in anytime 📍\n\n#ThankYou #LocalLove ${t}`,
+      ],
+      weekend_vibe:[
+        `Perfect for tonight 👌\n\n${n}${p?` — just ${p}`:""}\n\nSweet, refreshing & made for the weekend vibes 🙌\n\nWhether you're chilling at home or stocking up for a get-together... don't miss this!\n\n📍 ${s}\n\n#WeekendVibes #FridayFeeling ${t}`,
+        `Weekend sorted? Not yet... 👀\n\n${n} is waiting for you at ${s}${p?` — only ${p}`:""}\n\nThe perfect grab for tonight 🍻\n\nPop in on your way home!\n\n📍 ${s}\n\n#WeekendReady #TreatYourself ${t}`,
+        `🎉 WEEKEND INCOMING 🎉\n\n${n}${p?` just ${p}`:""} — grab it and go!\n\nYou deserve a treat this weekend. We've got you covered 😎\n\n📍 ${s}\n\n#SaturdayVibes #WeekendTreats ${t}`,
+      ],
+      staff_pick:[
+        `Honestly? This one caught us off guard 👏\n\n${n}${p?` — ${p}`:""}\n\nWe've been trying everything new that comes in and THIS is the one. Trust us.\n\nGive it a try — you won't regret it 🔥\n\n📍 ${s}\n\n#StaffPick #TryThis ${t}`,
+        `⭐ STAFF PICK OF THE WEEK ⭐\n\n${n}${p?` (${p})`:""}\n\nThe team can't stop talking about this one 😍\n\nSeriously — if you haven't tried it yet, what are you waiting for?!\n\n📍 ${s}\n\n#Recommended #WeTriedIt ${t}`,
+        `Right, we need to talk about ${n} 👀\n\n${p?`${p} and worth `:""} every penny.\n\nThe whole team agrees — this is a must-try. Don't just take our word for it, come see for yourself!\n\n📍 ${s}\n\n#StaffFavourite #MustTry ${t}`,
+      ],
     };
-    return fb[useStyle]||fb.new_arrival;
+    const list=variants[useStyle]||variants.new_arrival;
+    return list[Math.floor(Math.random()*list.length)];
   };
 
   // Generate caption — accepts optional style override to avoid stale closure
   const genCaption=async(styleOverride)=>{
     const useStyle=styleOverride||style;
-    setGenerating(true);
+    setGenerating(true);setApiError(null);
     try{
       const res=await fetch("/api/generate-caption",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({productName,price,storeName,style:useStyle})});
-      if(!res.ok)throw new Error(`API ${res.status}`);
       const data=await res.json();
-      if(data.caption&&data.caption.length>20)setCaption(data.caption);
-      else throw new Error("Empty caption");
+      if(res.ok&&data.caption&&data.caption.length>20){setCaption(data.caption);}
+      else{setApiError(data.detail||data.error||`Status ${res.status}`);setCaption(buildFallback(useStyle));}
     }catch(e){
-      console.warn("Caption API failed, using style fallback:",e.message);
+      console.warn("Caption API failed:",e.message);
+      setApiError(e.message);
       setCaption(buildFallback(useStyle));
     }
     setGenerating(false);
@@ -435,6 +461,7 @@ function CreateView({post:ep,storeName,onSave,onBack}){
           {CAPTION_STYLES.map(s=><button key={s.id} onClick={()=>selectStyle(s.id)} disabled={generating} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 8px",borderRadius:12,cursor:generating?"wait":"pointer",border:style===s.id?`1.5px solid ${C.purple}`:`1px solid ${C.border}`,background:style===s.id?C.purpleDim:C.surface,transition:"all 0.2s",opacity:generating&&style!==s.id?0.5:1}}><span style={{fontSize:16}}>{s.emoji}</span><div style={{fontSize:10,fontWeight:700,color:C.white}}>{s.label}</div><div style={{fontSize:8,color:C.dim}}>{s.best}</div></button>)}
         </div>
         {generating&&<div style={{textAlign:"center",padding:"8px 0 14px",fontSize:12,color:C.purple,fontWeight:600,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><RefreshCw size={12} style={{animation:"spin 1s linear infinite"}}/> Rewriting as {CAPTION_STYLES.find(s=>s.id===style)?.label}…</div>}
+        {apiError&&!generating&&<div style={{padding:"8px 12px",borderRadius:8,background:C.amberDim,border:`1px solid ${C.amber}33`,marginBottom:10,fontSize:10,color:C.amber,lineHeight:1.5}}>⚠️ AI API failed ({apiError.slice(0,100)}) — using template caption. Tap Regenerate for a different version.</div>}
         {!generating&&<Btn onClick={()=>genCaption()} style={{width:"100%",justifyContent:"center",padding:14,borderRadius:12,background:C.purpleDim,color:C.purple,border:`1px solid ${C.purple}33`,marginBottom:14}}>
           <Wand2 size={14}/> {caption?"Regenerate":"Generate"}
         </Btn>}
