@@ -388,11 +388,8 @@ function CreateView({post:ep,storeName,onSave,onBack}){
       ],
       price_hero:[
         `${n}!\n${p?`Just ${p} — `:""} Instore Only 🔥\n\nGrab It While Stock Lasts!!\n\n${t} #Deals`,
-        `${p?`${p} — `:""} ${n}!\n\nIn Store Now At ${s}!\n\nYou Won't Find It Cheaper Locally 👀 Be Quick!!\n\n${t}`,
-        `${n}${p?` Just ${p}!!`:""} 💰\n\nIn Store Only — ${s}\n\nDon't Miss This One!! Flying Out!!\n\n${t} #PriceDrop`,
-      ],
-        `💰 DEAL ALERT 💰\n\n${n}${p?` — JUST ${p}!!`:""}\n\nYou won't find this cheaper locally. In store NOW at ${s}\n\nGrab it before it's gone!\n\n#BargainAlert #Deals ${t}`,
-        `${p?`${p} — `:""} yes, you read that right 👀\n\n${n} now available at ${s}!\n\nIn Store Only — Be Quick!!\n\n#PriceDrop ${t}`,
+        `${p?`${p} — `:""} ${n}!\n\nIn Store Now At ${s}!\n\nYou Won't Find It Cheaper Locally Be Quick!!\n\n${t}`,
+        `${n}${p?` Just ${p}!!`:""}\n\nIn Store Only At ${s}\n\nDon't Miss This One!! Flying Out!!\n\n${t} #PriceDrop`,
       ],
       local_shoutout:[
         `You asked, we listened 👏\n\n${n} is now available at ${s}!${p?` Just ${p}.`:""}\n\nPop into the store and grab yours 🎁\n\nThank you for your support — you lot are the best ✨\n\n${t} #LocalShop`,
